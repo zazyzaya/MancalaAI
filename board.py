@@ -3,7 +3,7 @@ import time
 
 class Board():
     def __init__(self, num_cups=6, speed=0.5, human_game=True):
-        self.NUM_CUPS=6
+        self.NUM_CUPS=num_cups
         self.MAX_IDX=self.NUM_CUPS-1
         
         self.speed = speed
@@ -21,6 +21,8 @@ class Board():
         self.is_running = False 
         self.game_over = False
 
+        self.last_choice = None
+
     def __str__(self):
         fmt = lambda x : ['| ' + str(v).rjust(2) + ' ' for v in x]
         top_s = '  ' + ''.join(fmt(self.top))
@@ -29,9 +31,22 @@ class Board():
         labels = [' (%d) ' % i for i in range(1,self.NUM_CUPS+1)]
         labels = '\n   ' + ''.join(labels)
         bean_disp = '\t(%d)' % self.beans if self.beans else ''
+
+        if not self.human_game:
+            labels= '\n   ' + ('     ' * self.last_choice) + \
+                    ' (%d) '% (self.last_choice+1) + \
+                    ('    ' * (self.NUM_CUPS-self.last_choice-1))
         
+        # This runs after the turn is complete so.. 
+        if not self.human_game:
+            self.p1_turn = not self.p1_turn
+
         t = labels + '\n' if not (self.p1_turn or self.is_running) else ''
-        b = labels if self.p1_turn and not self.is_running else ''
+        b = labels if self.p1_turn and not self.is_running else '\n'
+
+        # It's hacky, but whatever
+        if not self.human_game:
+            self.p1_turn = not self.p1_turn
 
         outs = t + lines + '\n' \
             + top_s + '|\n' \
@@ -55,6 +70,8 @@ class Board():
 
         self.active_row = self.bottom if self.p1_turn else self.top 
         cup = self.MAX_IDX-cup if self.p1_turn else cup 
+        self.last_choice = cup 
+        
         self.beans = self.active_row[cup]
         
         # Can't pick from an empty cup
@@ -145,6 +162,5 @@ class Board():
 
             self.display(disp, '=== GAME OVER ===', winner)
             self.game_over = True 
-            return False 
 
         return True
