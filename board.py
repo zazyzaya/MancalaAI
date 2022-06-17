@@ -19,6 +19,7 @@ class Board():
         self.active_row = self.bottom
         self.beans = 0
         self.is_running = False 
+        self.game_over = False
 
     def __str__(self):
         fmt = lambda x : ['| ' + str(v).rjust(2) + ' ' for v in x]
@@ -143,5 +144,7 @@ class Board():
                 winner = "   IT'S A TIE!   "
 
             self.display(disp, '=== GAME OVER ===', winner)
+            self.game_over = True 
             return False 
+
         return True
