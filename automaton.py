@@ -1,6 +1,8 @@
 from copy import deepcopy
 import time
 
+from joblib import Parallel, delayed
+
 import json 
 from board import Board
 
@@ -15,11 +17,32 @@ class MiniMaxTree():
     def __init__(self, board):
         self.root = Node(None, 0, None, board)
 
+    def update_root(self, node):
+        '''
+        Assumes node is child of self.root
+        '''
+        siblings = self.root.children
+        self.root = node 
+        self.root.parent = None
+
+        for sib in siblings:
+            if sib != self.root:
+                self._recursive_delete(sib)
+
+    def _recursive_delete(self, n):
+        if n.children:
+            [self._recursive_delete(c) for c in n.children]
+        del n
+
     def _explore_one(self, parent):
         '''
         Expand all possible children
         '''
         children = []
+
+        # Avoid repeating computation
+        if len(parent.children):
+            return []
 
         if parent.game_over():
             return []
@@ -51,10 +74,15 @@ class MiniMaxTree():
         wants = lambda x  : x < 0 if is_min else x > 0
         
         # Overwrites wins that occur later. The best option is to win now
-        winners = [c for c in choices if c.game_over and wants(c.heuristic)]
-        if len(winners):
-            choice = min(winners) if is_min else max(winners)
-            score = -float('inf') if is_min else float('inf')
+        endgame = [
+            c for c in choices 
+            if c.game_over() or c.dead
+        ]
+        if len(endgame):
+            choice = min(endgame) if is_min else max(endgame)
+            score = -float('inf') if choice.score < 0 \
+                     else float('inf') if choice.score > 0 \
+                     else 0 # Can't forget about ties
 
         else:
             choice = min(choices) if is_min else max(choices)
@@ -63,8 +91,8 @@ class MiniMaxTree():
         return score, choice
 
 
-    def search(self, node, depth, is_min):
-        if depth == 0:
+    def search(self, node, depth, is_min, top=False):
+        if depth == 0 or node.dead:
             return self._heuristic([node], is_min)
 
         node.add_children(self._explore_one(node))
@@ -78,6 +106,9 @@ class MiniMaxTree():
             score, choice = self._heuristic(node.children, is_min)
             
         node.heuristic = score
+        if top:
+            print([c.heuristic for c in node.children])
+
         return choice
 
 
@@ -85,8 +116,8 @@ class AlphaBetaPruning(MiniMaxTree):
     '''
     Optimizing MiniMax to look at fewer options
     '''
-    def search(self, node, depth, is_min, alpha=-float('inf'), beta=float('inf')):
-        if depth == 0:
+    def search(self, node, depth, is_min, alpha=-float('inf'), beta=float('inf'), top=False):
+        if depth == 0 or node.dead:
             return self._heuristic([node], is_min)
 
         node.add_children(self._explore_one(node))
@@ -120,25 +151,58 @@ class AlphaBetaPruning(MiniMaxTree):
 
         score, choice = self._heuristic(children_I_love, is_min)
         node.heuristic = score 
+
+        if top:
+            print([c.heuristic for c in children_I_love])
         return choice
+
+
+class ConcurrentSearcher():
+    '''
+        Manages searches for a given TreeSearch object
+        Doesn't really work for AlphaBeta, but should (?) 
+        improve MiniMax
+    '''
+    def __init__(self, Tree, n_jobs=8):
+        self.Tree = Tree
+        self.workers = n_jobs
+
+    def search(self, depth, is_min):
+        print('Conc search has been called')
+        node = self.Tree.root
+
+        node.add_children(self.Tree._explore_one(node))
+        if len(node.children) == 1:
+            return node.children[0]
         
+        children = Parallel(n_jobs=self.workers, prefer='processes')(
+            delayed(self.Tree.search)(n, depth-1, not is_min)
+            for n in node.children
+        )
+
+        score, choice = self.Tree._heuristic(children, is_min)
+        node.heuristic = score 
+        return choice
+
 
 class Node():
     def __init__(self, idx, score, parent, board):
         self.idx = idx
         self.score = score
-        self.solution = board.game_over
-        self.parent = parent
         self.board = board 
         self.children = []
         self.heuristic = self.score 
+
+        self.dead = False 
+        win_condition = board.NUM_CUPS*4
+        if board.p1_score > win_condition or board.p2_score > win_condition: 
+            self.dead = True 
 
     def add_child(self, child):
         self.children.append(child)
         child.parent=self
 
     def add_children(self, children):
-        self.children = []
         [self.add_child(c) for c in children]
 
     def game_over(self):
@@ -147,23 +211,13 @@ class Node():
     def display(self):
         self.board.display(True)
 
-    # It really feels like there should be a 
-    # better way to do this... 
     def __lt__(self,other):
         return self.heuristic < other.heuristic
     def __gt__(self,other):
         return self.heuristic > other.heuristic
-    def __eq__(self,other):
-        return self.heuristic == other.heuristic
-    def __le__(self,other):
-        return self.heuristic <= other.heuristic 
-    def __ge__(self,other):
-        return self.heuristic >= other.heuristic
-    def __ne__(self,other):
-        return self.heuristic != other.heuristic
 
 
-def play_with_yourself(TreeSearch, depth=6):
+def play_with_yourself(TreeSearch, depth):
     b = Board(human_game=False, speed=0)
     tree = TreeSearch(b)
     ts = []
@@ -171,18 +225,27 @@ def play_with_yourself(TreeSearch, depth=6):
     p2 = False 
     while(not tree.root.game_over()):
         st = time.time()
-        move = tree.search(tree.root, depth, p2)
+        move = tree.search(tree.root, depth, p2, top=True)
         ts.append(time.time()-st)
 
-        tree.root = move 
+        tree.update_root(move)
         move.display()
-        print('Assumed value: ',move.heuristic,'\n\n')
+        print('Selection value: ',move.heuristic)
+        print('Elapsed: %0.2f\n\n' % ts[-1])
 
         p2 = not p2
 
     print("Avg time to search: %0.4f" % (sum(ts) / len(ts)))
+    return sum(ts)/len(ts)
 
 if __name__ == '__main__':
-    play_with_yourself(
-        AlphaBetaPruning
+    mm = play_with_yourself(
+        MiniMaxTree, 8
     )
+
+    ab = play_with_yourself(
+        AlphaBetaPruning, 8
+    )
+
+    print('MM Tree: ', mm) # 2.1804s
+    print('AB Tree: ', ab) # 0.2799s ~10x!
