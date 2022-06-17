@@ -13,7 +13,7 @@ def get_move():
         return get_move()
 
     if move < 7 and move > 0:
-        return move 
+        return move-1
     else: 
         if move in [69, 420, 42, 8675309, 8008132, 80082]:
             if move not in JOKES_MADE:
@@ -31,7 +31,7 @@ def get_move():
         return get_move()
 
 def main():
-    board = Board()
+    board = Board(speed=0)
     board.display(True)
 
     try:
@@ -41,6 +41,7 @@ def main():
 
     while board.turn(move):
         print('\n\n')
+        board.display(True)
         try:
             move = get_move()
         except KeyboardInterrupt:

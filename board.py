@@ -2,9 +2,12 @@
 import time 
 
 class Board():
-    def __init__(self, num_cups=6):
+    def __init__(self, num_cups=6, speed=0.5, human_game=True):
         self.NUM_CUPS=6
         self.MAX_IDX=self.NUM_CUPS-1
+        
+        self.speed = speed
+        self.human_game = human_game
 
         self.top = [4] * self.NUM_CUPS 
         self.bottom = [4] * self.NUM_CUPS
@@ -15,6 +18,7 @@ class Board():
         self.p1_turn = True
         self.active_row = self.bottom
         self.beans = 0
+        self.is_running = False 
 
     def __str__(self):
         fmt = lambda x : ['| ' + str(v).rjust(2) + ' ' for v in x]
@@ -25,8 +29,8 @@ class Board():
         labels = '\n   ' + ''.join(labels)
         bean_disp = '\t(%d)' % self.beans if self.beans else ''
         
-        t = labels + '\n' if not self.p1_turn else ''
-        b = labels if self.p1_turn else ''
+        t = labels + '\n' if not (self.p1_turn or self.is_running) else ''
+        b = labels if self.p1_turn and not self.is_running else ''
 
         outs = t + lines + '\n' \
             + top_s + '|\n' \
@@ -42,16 +46,26 @@ class Board():
         if verbose:
             print(self)
             if args:
-                print(args)
-            time.sleep(0.5)
+                print(*args)
+            time.sleep(self.speed)
 
     def turn(self, cup, disp=True):
-        cup = self.NUM_CUPS-cup if self.p1_turn else cup 
+        self.is_running = True 
+
+        self.active_row = self.bottom if self.p1_turn else self.top 
+        cup = self.MAX_IDX-cup if self.p1_turn else cup 
         self.beans = self.active_row[cup]
         
         # Can't pick from an empty cup
         if self.beans == 0: 
-            return False # TODO this will end the game
+            # Need the AI to know this isn't a valid move
+            if not self.human_game:
+                return False
+            # But if a human makes a mistake it's okay
+            else:
+                print("Come on, don't take from an empty cup")
+                self.is_running = False 
+                return True 
 
         self.active_row[cup] = 0
         self.display(disp)
@@ -112,6 +126,7 @@ class Board():
                 self.display(disp)
         
         self.p1_turn = not self.p1_turn
+        self.is_running = False
 
         if not sum(self.top) or not sum(self.bottom):
             self.p1_score += sum(self.bottom)
