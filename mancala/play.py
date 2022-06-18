@@ -1,5 +1,9 @@
 from board import Board 
 
+'''
+Command line version of the game for two players
+'''
+
 JOKES_MADE = []
 
 def get_move():
