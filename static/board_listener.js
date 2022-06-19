@@ -242,7 +242,7 @@ function gameover(resp) {
     var comp = $('#computer');
 
     // Keep him smug if he wins
-    if (resp['winner'] == 1) {
+    if (resp['winner'] == 2) {
         alert(
             ' =========== Game Over ========== \n' +
             ' .....Better luck next time......\n' +
@@ -257,7 +257,7 @@ function gameover(resp) {
 
         // Delay it bc it takes a sec for the picture to change
         setTimeout(() => {
-            if (resp['winner'] == 2) {
+            if (resp['winner'] == 1) {
                 alert(
                     ' =========== Game Over ========== \n' +
                     ' ........Congradulations!........\n' +
