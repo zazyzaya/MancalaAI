@@ -163,3 +163,150 @@ class Board():
             self.game_over = True 
 
         return True
+
+    def fmt_state(self, cup, row, beans, scoring=False):
+        '''
+        Formats JSON outs for webapp 
+        '''
+        cid = self.MAX_IDX - cup if row == self.bottom else cup 
+        row = '1' if row == self.top else '2'
+        
+        if cid is not None:
+            cid += 1
+
+        cid = str(cid)
+        cid = 'cup'+row+cid if not scoring else scoring+'_goal'
+        
+        return {
+            'state': 'running',
+            'id': cid, 
+            'beans': beans
+        }
+
+
+class WebBoard(Board):
+    def webturn(self, cup):
+        '''
+        Returns list of board updates 
+        used by the web application to update the UI
+        Also strips a lot of the bells and whistles used 
+        to format output strings and so forth in the cmd version
+        '''
+        self.active_row = self.bottom if self.p1_turn else self.top 
+        cup = self.MAX_IDX-cup if self.p1_turn else cup 
+        self.last_choice = cup 
+        
+        self.beans = self.active_row[cup]
+        
+        # Can't pick from an empty cup
+        if self.beans == 0:
+            return []
+
+        states = []
+        self.active_row[cup] = 0   
+        states.append(self.fmt_state(cup, self.active_row, 0))
+
+        while self.beans: 
+            cup += 1 
+            row = self.active_row
+
+            # If we're passing over a mancala 
+            if cup == self.NUM_CUPS:
+                if self.p1_turn and row == self.top: 
+                    self.p1_score += 1
+                    self.beans -= 1
+                    states.append(self.fmt_state(None, None, self.p1_score, 'p1'))
+
+                elif not self.p1_turn and row == self.bottom: 
+                    self.p2_score += 1 
+                    self.beans -= 1 
+                    states.append(self.fmt_state(None, None, self.p2_score, 'p2'))
+                
+                # Kind of hacky, but cup is incrimented at the
+                # beginning of the loop and needs to be 0
+                cup = -1 
+
+                # Then swap rows 
+                if row == self.bottom:
+                    self.active_row = self.top 
+                else: 
+                    self.active_row = self.bottom
+
+                continue 
+
+            # Place a bean 
+            row[cup] += 1 
+            self.beans -= 1 
+            states.append(self.fmt_state(cup, row, row[cup]))
+
+            if self.beans == 0: 
+                # Grab the beans and keep going
+                if row[cup] > 1: 
+                    self.beans = row[cup]
+                    row[cup] = 0
+                    states.append(self.fmt_state(cup, row, 0))
+                
+                # Or if your last bean is in an empty cup on 
+                # your side, you steal the beans from the cup
+                # of your opponent on the other side
+                elif row == self.bottom and self.p1_turn:
+                    self.p1_score += self.top[self.MAX_IDX-cup]
+                    self.top[self.MAX_IDX-cup] = 0
+                    
+                    states.append(self.fmt_state(self.MAX_IDX-cup, self.top, 0))
+                    states.append(self.fmt_state(None, None, self.p1_score, 'p1'))
+
+                elif row == self.top and not self.p1_turn:
+                    self.p2_score += self.bottom[self.MAX_IDX-cup]
+                    self.bottom[self.MAX_IDX-cup] = 0
+
+                    states.append(self.fmt_state(self.MAX_IDX-cup, self.bottom, 0))
+                    states.append(self.fmt_state(None, None, self.p2_score, 'p2'))
+
+                # Placing in the empty cup across the board just ends
+                # the turn with no fanfare
+                else:
+                    break
+        
+        if not sum(self.top):
+            sc = self.p1_score
+            for i in range(6):
+                if self.bottom[i]:
+                    sc += self.bottom[i]
+                    states.append(self.fmt_state(i, self.bottom, 0))
+                    states.append(self.fmt_state(None, None, sc, 'p1'))
+
+        elif not sum(self.bottom):
+            sc = self.p2_score
+            for i in range(6):
+                if self.top[i]:
+                    sc += self.top[i]
+                    states.append(self.fmt_state(i, self.top, 0))
+                    states.append(self.fmt_state(None, None, sc, 'p1'))
+
+        if not sum(self.top) or not sum(self.bottom):
+            winner = '      Player 1      ' if self.p1_score > self.p2_score \
+                else '      Player 2      ' if self.p2_score > self.p1_score \
+                else "No one,  it's a tie!"
+            states.append({'state': 'gameover', 'winner': winner})
+
+        self.p1_turn = not self.p1_turn
+        return states
+
+    
+    def build_from_webstate(self, webstate):
+        self.top = [int(t) for t in webstate['top']]
+        self.bottom = [int(b) for b in webstate['bottom']]
+        self.p1_turn = webstate['p1_turn']
+        self.p1_score = int(webstate['p1_score'])
+        self.p2_score = int(webstate['p2_score'])
+
+    
+    def toweb(self):
+        return dict(
+            top=self.top,
+            bottom=self.bottom,
+            p1_turn=self.p1_turn,
+            p1_score=self.p1_score,
+            p2_score=self.p2_score
+        )

@@ -1,10 +1,7 @@
 from copy import deepcopy
 import time
 
-from joblib import Parallel, delayed
-
-import json 
-from board import Board
+from .board import Board
 
 '''
 Some things to keep in mind: 
@@ -157,34 +154,6 @@ class AlphaBetaPruning(MiniMaxTree):
         return choice
 
 
-class ConcurrentSearcher():
-    '''
-        Manages searches for a given TreeSearch object
-        Doesn't really work for AlphaBeta, but should (?) 
-        improve MiniMax
-    '''
-    def __init__(self, Tree, n_jobs=8):
-        self.Tree = Tree
-        self.workers = n_jobs
-
-    def search(self, depth, is_min):
-        print('Conc search has been called')
-        node = self.Tree.root
-
-        node.add_children(self.Tree._explore_one(node))
-        if len(node.children) == 1:
-            return node.children[0]
-        
-        children = Parallel(n_jobs=self.workers, prefer='processes')(
-            delayed(self.Tree.search)(n, depth-1, not is_min)
-            for n in node.children
-        )
-
-        score, choice = self.Tree._heuristic(children, is_min)
-        node.heuristic = score 
-        return choice
-
-
 class Node():
     def __init__(self, idx, score, parent, board):
         self.idx = idx
@@ -230,6 +199,7 @@ def play_with_yourself(TreeSearch, depth):
 
         tree.update_root(move)
         move.display()
+
         print('Selection value: ',move.heuristic)
         print('Elapsed: %0.2f\n\n' % ts[-1])
 
