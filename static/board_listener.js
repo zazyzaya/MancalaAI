@@ -2,7 +2,7 @@
 var human_turn = true; 
 var running = false;
 var movetime = 200;
-var thinktime = 2000;
+var THINKTIME = 2000;
 var moves_left = 0;
 
 // Add listeners
@@ -134,13 +134,13 @@ function make_move(id) {
 }
 
 function animate_move(resp, delay) { 
-    if (resp['state'] == 'gameover') { return gameover(); }
-    
     var moves = resp['moves'];
     running = true; 
     moves_left += resp['n_updates'];
 
     for (let i=0; i<resp['n_updates']; i++) {
+        if (moves[i]['state'] == 'gameover') { return gameover(); }
+
         setTimeout(function fn(){
             if (moves[i]['id'][0] == 'c') {
                 update_cups(moves[i]['id'], moves[i]['beans']);
@@ -168,8 +168,6 @@ function process_move(resp) {
 
     */
     if (resp['state'] != 'valid') { return; }
-    else if (resp['state'] == 'gameover') {return gameover(resp); }
-
     animate_move(resp,0);
 
     // While we're waiting on the animation, get the AI's response
@@ -188,14 +186,10 @@ function process_move(resp) {
         comp.empty();
         comp.append('<img src="/static/img/adversary/thinking.png"/>')
     }, elapsed);
-    
-    elapsed += thinktime;
-    setTimeout(() => {
-        comp.empty();
-        comp.append('<img src="/static/img/adversary/solving.png"/>')
-    }, elapsed)
 
+    
     // Get computer response and animate it
+    var fetch_time = new Date().getTime();
     f = fetch(
         '/bot', {
             headers: {
@@ -207,15 +201,32 @@ function process_move(resp) {
     ).then(function tojs(resp_ai) {
         resp_ai.json().then(
             function fn(resp_ai) { 
-                animate_move(resp_ai, thinktime+resp['n_updates']*movetime);
-                
-                // A bit cheesy, but it's unlikely more than 1 move happened
-                // and it's tricky getting ai_moves out of that .then() function
-                elapsed = (moves_left*movetime) + thinktime;
+                // If AI was actually thinking, don't wait to set his face to 
+                // be solving when we get here
+                var time_to_solve = (new Date()).getTime() - fetch_time;
+                var time_remaining = elapsed+THINKTIME;
+
+                console.log(time_to_solve);
+                console.log(time_remaining);
+
+                var delay; 
+                if (time_remaining - time_to_solve > 0) { 
+                    delay = time_remaining-time_to_solve; 
+                }
+                else {
+                    delay = 0;
+                }
+                setTimeout(() => {
+                    comp.empty();
+                    comp.append('<img src="/static/img/adversary/solving.png"/>')
+                }, delay); 
+
+                // Update after done thinking (if applicable) and moving
+                animate_move(resp_ai, delay);
                 setTimeout(() => {
                     comp.empty();
                     comp.append('<img src="/static/img/adversary/waiting.png"/>')
-                }, elapsed);
+                }, delay+resp_ai['n_updates']*movetime);
             }
         )
     })

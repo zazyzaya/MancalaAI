@@ -43,11 +43,11 @@ def bot():
     print(req)
 
     depth = int(req['depth'])
-    board = WebBoard()
+    board = WebBoard(human_game=False)
     board.build_from_webstate(req['state'])
     
     bot = AlphaBetaPruning(board)
-    decision = bot.search(bot.root, depth, True)
+    decision = bot.search(bot.root, depth, True, top=True)
 
     moves = board.webturn(decision.idx)
 

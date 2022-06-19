@@ -1,4 +1,5 @@
 from copy import deepcopy
+import random
 import time
 
 from .board import Board
@@ -114,6 +115,10 @@ class AlphaBetaPruning(MiniMaxTree):
     Optimizing MiniMax to look at fewer options
     '''
     def search(self, node, depth, is_min, alpha=-float('inf'), beta=float('inf'), top=False):
+        if top and depth == 0:
+            node.add_children(self._explore_one(node))
+            return random.choice(node.children)
+
         if depth == 0 or node.dead:
             return self._heuristic([node], is_min)
 
