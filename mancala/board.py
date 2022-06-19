@@ -270,6 +270,8 @@ class WebBoard(Board):
         
         if not sum(self.top):
             sc = self.p1_score
+            self.p1_score += sum(self.bottom)
+
             for i in range(6):
                 if self.bottom[i]:
                     sc += self.bottom[i]
@@ -278,6 +280,8 @@ class WebBoard(Board):
 
         elif not sum(self.bottom):
             sc = self.p2_score
+            self.p2_score += sum(self.top)
+
             for i in range(6):
                 if self.top[i]:
                     sc += self.top[i]
@@ -285,9 +289,9 @@ class WebBoard(Board):
                     states.append(self.fmt_state(None, None, sc, 'p1'))
 
         if not sum(self.top) or not sum(self.bottom):
-            winner = '      Player 1      ' if self.p1_score > self.p2_score \
-                else '      Player 2      ' if self.p2_score > self.p1_score \
-                else "No one,  it's a tie!"
+            winner = 1 if self.p1_score > self.p2_score \
+                else 2 if self.p2_score > self.p1_score \
+                else 0
             states.append({'state': 'gameover', 'winner': winner})
 
         self.p1_turn = not self.p1_turn

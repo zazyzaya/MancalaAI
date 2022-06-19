@@ -1,6 +1,5 @@
 // Some useful globals
 var human_turn = true; 
-var running = false;
 var movetime = 200;
 var THINKTIME = 2000;
 var moves_left = 0;
@@ -135,11 +134,18 @@ function make_move(id) {
 
 function animate_move(resp, delay) { 
     var moves = resp['moves'];
-    running = true; 
     moves_left += resp['n_updates'];
 
     for (let i=0; i<resp['n_updates']; i++) {
-        if (moves[i]['state'] == 'gameover') { return gameover(); }
+        if (moves[i]['state'] == 'gameover') { 
+            setTimeout(
+                function () {
+                    moves_left = 0;
+                    return gameover(moves[i]); 
+                }, (movetime*i) + delay
+            )
+            continue
+        }
 
         setTimeout(function fn(){
             if (moves[i]['id'][0] == 'c') {
@@ -233,19 +239,52 @@ function process_move(resp) {
 }
 
 function gameover(resp) { 
-    alert(
-        ' =========== Game Over ========== \n' +
-        '  Congratulations! The Winner is  \n' +
-        '        ' + resp['winner']
-    );
-    reset(); 
+    var comp = $('#computer');
+
+    // Keep him smug if he wins
+    if (resp['winner'] == 1) {
+        alert(
+            ' =========== Game Over ========== \n' +
+            ' .....Better luck next time......\n' +
+            ' ...........The bot wins......... '
+        );
+        reset();
+
+    } else {
+        // Otherwise make him normal again 
+        comp.empty();
+        comp.append('<img src="/static/img/adversary/waiting.png"/>');
+
+        // Delay it bc it takes a sec for the picture to change
+        setTimeout(() => {
+            if (resp['winner'] == 2) {
+                alert(
+                    ' =========== Game Over ========== \n' +
+                    ' ........Congradulations!........\n' +
+                    ' ........You beat the bot!....... '
+                );
+            } else {
+                alert(
+                    ' =========== Game Over ========== \n' +
+                    ' ........Not bad, not bad........\n' +
+                    " ...........It's a tie!.......... "
+                );
+            } 
+            reset(); 
+        }, 100);
+    }
+    
 }
 
 function reset() {
     $(".cup").each(function() {
         update_cups(this.id, 4);
     });
-    $(".goal").map(function() {
+    $(".goal").each(function() {
         update_goal(this.id, 0);
     });
+
+    moves_left=0;
+    comp.empty();
+    comp.append('<img src="/static/img/adversary/waiting.png"/>');
 }

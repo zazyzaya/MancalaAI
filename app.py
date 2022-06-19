@@ -45,6 +45,7 @@ def bot():
     depth = int(req['depth'])
     board = WebBoard(human_game=False)
     board.build_from_webstate(req['state'])
+    board.p1_turn = False # on the bots turn in will never be p1 turn 
     
     bot = AlphaBetaPruning(board)
     decision = bot.search(bot.root, depth, True, top=True)

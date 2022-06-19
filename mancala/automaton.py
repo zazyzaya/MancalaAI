@@ -119,10 +119,16 @@ class AlphaBetaPruning(MiniMaxTree):
             node.add_children(self._explore_one(node))
             return random.choice(node.children)
 
-        if depth == 0 or node.dead:
-            return self._heuristic([node], is_min)
+        if depth == 0 or (node.dead and not top):
+            return self._heuristic([node], is_min)[1]
 
         node.add_children(self._explore_one(node))
+
+        # If there's just one option, don't bother exploring
+        # the decision tree
+        if top and len(node.children) == 1:
+            return node.children[0]
+
         if node.children == []:
             return self._heuristic([node], is_min)
 
@@ -213,7 +219,29 @@ def play_with_yourself(TreeSearch, depth):
     print("Avg time to search: %0.4f" % (sum(ts) / len(ts)))
     return sum(ts)/len(ts)
 
+
+def bugtest():
+    from board import WebBoard
+    state = dict(
+        bottom= [4, 1, 0, 0, 2, 0],
+        p1_score= "12",
+        p1_turn= True,
+        p2_score= "25",
+        top= [1, 1, 1, 0, 0, 1]
+    )
+
+    b = WebBoard(human_game=False)
+    b.build_from_webstate(state)
+
+    bot = AlphaBetaPruning(b)
+    decision = bot.search(bot.root, 5, True, top=True)
+    print(decision)
+
+
 if __name__ == '__main__':
+    bugtest()
+    exit()
+
     mm = play_with_yourself(
         MiniMaxTree, 8
     )
